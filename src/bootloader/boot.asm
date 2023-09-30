@@ -33,6 +33,14 @@ start:
     jmp 0x7C0:step2; set code segment to 0x7C0
     ;relying on bios initialization of segments might crash the bootloader so in this section segment registers
     ;are initialized without relying on bios so making it more hardware independent
+;interrupts are signal to the cpu. below is a custom implementation of interrupt 0. https://wiki.osdev.org/Interrupts.
+;when int 0 gets called, it will jump here
+handle_zero: ;code implementation of interrupt 0
+    mov ah, 0eh
+    mov al, 'A'
+    mov bx, 0x00
+    int 0x10 ;a bios interrupt for video services
+    iret ;return from interrupt
 step2:
     cli ;disable device interrputs. section below is critical and it must be initialized without any interruption.
 
@@ -47,6 +55,13 @@ step2:
     mov sp, 0x7C00 ;initializing stack pointer at address 0x7C00 enables a 
 
     sti ;enable interrupt flag and exit critical section of the code.
+
+    mov word[ss:0x00], handle_zero ; interrupts are 4 bytes long in the interrupt vector table. first 2 bytes are for offset 
+    mov word[ss:0x02], 0x7C0 ;and last 2 is for segments. so here interrupt 0 is set to the address of 00:7xC0 to 00:7xC2
+    int 0;here is an interrupt call for 0. interrupt 0 is called when divide by 0 exception occurs (https://wiki.osdev.org/Exceptions)
+    ;code below forces a call for interrupt 0 even though interrupt 0 is not called, it will execute.
+    mov ax, 0x00 ;load a register with 0
+    div ax ;divide a with itself resulting in a interrupt 0 call
 
     mov si, message
     call print
