@@ -91,6 +91,10 @@ load32:
     mov ss, ax
     mov ebp, 0x00200000
     mov esp, ebp
+    in al, 0x92
+    ;https://wiki.osdev.org/A20_Line enabling a20 line.
+    or al, 2
+    out 0x92, al
     jmp $
 times 510-($-$$) db 0;fills 510 bytes of data ($ -> current address $$ -> beginning of current section 
                     ;so $-$$ -> how far this in this section
