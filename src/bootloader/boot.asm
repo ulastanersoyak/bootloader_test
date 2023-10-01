@@ -83,7 +83,6 @@ error:
 ;   div ax ;divide a with itself resulting in a interrupt 0 call
 ;   mov si, message
 ;   call print
-
     jmp $
 print:
     mov bx, 0
