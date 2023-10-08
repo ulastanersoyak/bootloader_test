@@ -1,32 +1,27 @@
-boot_binary := ./bin/boot.bin
-virtual_machine := qemu-system-x86_64
-SRC_DIR := ./src
-BIN_DIR := ./bin
-BUILD_DIR := ./build
+FILES := ./build/kernel.asm.o
 
-FILES := $(BIN_DIR)/os.bin
-BOOT_ASM_SRC := $(SRC_DIR)/bootloader/boot.asm
-KERNEL_ASM_SRC := $(SRC_DIR)/kernel.asm
-KERNEL_ASM_OBJ := $(BUILD_DIR)/kernel.asm.o
+all: ./bin/boot.bin ./bin/kernel.bin
+	rm -rf ./bin/os.bin
+	dd if=./bin/boot.bin >> ./bin/os.bin
+	dd if=./bin/kernel.bin >> ./bin/os.bin
+	dd if=/dev/zero bs=512 count=100 >> ./bin/os.bin
 
-all: $(FILES)
-	rm -rf $(BIN_DIR)/os.bin
-	dd if=$(boot_binary) >> $(FILES)
+./bin/kernel.bin: $(FILES)
+	i686-elf-ld -g -relocatable $(FILES) -o ./build/kernelfull.o
+	i686-elf-gcc -T ./src/linker.ld -o ./bin/kernel.bin -ffreestanding -O0 -nostdlib ./build/kernelfull.o
 
-$(boot_binary): $(BOOT_ASM_SRC) | $(BIN_DIR)
-	nasm -f bin $(BOOT_ASM_SRC) -o $(boot_binary)
+./bin/boot.bin: ./src/bootloader/boot.asm
+	nasm -f bin ./src/bootloader/boot.asm -o ./bin/boot.bin
 
-$(KERNEL_ASM_OBJ): $(KERNEL_ASM_SRC) | $(BUILD_DIR)
-	nasm -f elf -g $(KERNEL_ASM_SRC) -o $(KERNEL_ASM_OBJ)
+./build/kernel.asm.o: ./src/kernel.asm
+	nasm -f elf -g ./src/kernel.asm -o ./build/kernel.asm.o
 
-qemu: $(boot_binary)
-	$(virtual_machine) -hda $(boot_binary)
+qemu: ./bin/os.bin
+	qemu-system-x86_64 -hda ./bin/os.bin
 
 clean:
-	rm -rf $(BIN_DIR)
-
-$(BIN_DIR):
-	mkdir -p $(BIN_DIR)
-
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+	rm -rf ./bin/boot.bin
+	rm -rf ./bin/kernel.bin
+	rm -rf ./bin/os.bin
+	rm -rf ./build/kernelfull.o
+	rm -rf $(FILES)

@@ -18,6 +18,7 @@
 ;for further reading :
 ;https://stackoverflow.com/questions/26539603/why-bootloaders-for-x86-use-16bit-code-first
 ;https://www.quora.com/Why-do-CPUs-start-executing-code-in-16-bit-mode
+
 org 0x7C00
 BITS 16
 CODE_SEG equ gdt_code - gdt_start
@@ -51,8 +52,8 @@ step2:
     mov eax, cr0
     or eax, 0x1
     mov cr0, eax
-;    jmp CODE_SEG:load32
-    jmp $
+    jmp CODE_SEG:load32
+
 ; GDT
 gdt_start:
 gdt_null:
@@ -81,6 +82,63 @@ gdt_end:
 gdt_descriptor:
     dw gdt_end - gdt_start-1
     dd gdt_start
+
+[BITS 32]
+load32:
+  mov eax, 1 ;sector to load from. sector 0 is bootloader and kernel starts from sector 1
+  mov ecx, 100 ;number of total sectors declared in makefiles linker part (dd if=/dev/zero bs=512 count=100 >> ./bin/os.bin)
+  mov edi, 0x0100000 ;address to load kernel into
+  call ata_lba_read
+  jmp CODE_SEG:0x0100000
+
+ata_lba_read:
+  mov ebx, eax ;backup lba (logical block addressing)
+  ;send highest 8 bits of lba to hard disk controller
+  shr eax, 24 ;shift right by 24 bits giving highest 8 bits as result
+  or eax, 0xE0 ;select master drive
+  mov dx, 0x1F6 ;port
+  out dx, al ;sent highest 8 bits to lba
+  ;send the total to read
+  mov eax, ecx
+  mov dx, 0x1F2
+  out dx, al ;finished sending
+  ;send more bits of lba
+  mov eax ,ebx ;restore backup lba
+  mov dx, 0x1F3
+  out dx, al
+  ;finised sending more bits
+  mov dx, 0x1F4
+  mov eax,ebx 
+  shr eax, 8
+  out dx, al
+  ;send upper 16 bits of lba
+  mov dx, 0x1F5
+  mov eax ,ebx ;restore backup lba
+  shr eax, 16
+  out dx, al
+  ;finished upper 16 bits
+  mov dx, 0x1F7
+  mov al, 0x20
+  out dx, al
+  ;read all sectors into memory
+.next_sector:
+  push ecx
+
+.try_again: ; check if more reads needed
+  mov dx, 0x1F7
+  in al, dx
+  test al, 8
+  jz .try_again
+
+  ;read 256 words at a time (512 bytes = 1 sector)
+  mov ecx, 256
+  mov dx, 0x1F0
+  rep insw ;reads word ecx times (256 in this case) from the porx 0x1F0 and stores it do the edi register (0x0100000 in this case)
+  pop ecx 
+  loop .next_sector
+  ;end of reading sectors into memory
+  ret
+
 times 510-($-$$) db 0;fills 510 bytes of data ($ -> current address $$ -> beginning of current section 
                     ;so $-$$ -> how far this in this section
 dw 0xAA55;bios recognizes the bootloader from the signatur of 0x55AA on last 2 bytes of the 512 byte block. it is written reverse
