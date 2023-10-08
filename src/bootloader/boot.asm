@@ -90,7 +90,7 @@ load32:
   mov edi, 0x0100000 ;address to load kernel into
   call ata_lba_read
   jmp CODE_SEG:0x0100000
-
+;https://wiki.osdev.org/ATA_read/write_sectors
 ata_lba_read:
   mov ebx, eax ;backup lba (logical block addressing)
   ;send highest 8 bits of lba to hard disk controller
